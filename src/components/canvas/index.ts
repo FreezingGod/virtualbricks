@@ -1,0 +1,6 @@
+export { LegoCanvas } from './LegoCanvas'
+export { BrickScene } from './BrickScene'
+export { BrickMesh } from './BrickMesh'
+export { GhostBrick } from './GhostBrick'
+export { PhysicsBrickScene } from './PhysicsBrickScene'
+export { PhysicsBrickMesh } from './PhysicsBrickMesh'
