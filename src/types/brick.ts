@@ -6,10 +6,38 @@ import type { BufferGeometry } from 'three'
 export type BrickCategory =
   | 'basic'       // Basic bricks, plates, tiles
   | 'slope'       // Slopes and ramps
+  | 'round'       // Round bricks, plates, cones
   | 'technic'     // Technic beams, pins, axles
   | 'special'     // Special elements
   | 'minifig'     // Minifigure parts
   | 'decoration'  // Decorative elements
+
+/**
+ * Brick shape types for geometry generation
+ */
+export type BrickShape =
+  | 'box'         // Standard rectangular brick
+  | 'slope'       // Sloped brick (specify angle in shapeParams)
+  | 'slope_inverted' // Inverted slope
+  | 'round'       // Round brick/plate (1x1 round)
+  | 'cylinder'    // Cylindrical brick
+  | 'cone'        // Cone shaped
+  | 'wedge'       // Wedge shaped
+  | 'arch'        // Arch brick
+
+/**
+ * Shape-specific parameters
+ */
+export interface ShapeParams {
+  // For slopes: angle in degrees (33, 45, 65, etc.)
+  slopeAngle?: number
+  // For slopes: direction ('front', 'back', 'left', 'right')
+  slopeDirection?: 'front' | 'back' | 'left' | 'right'
+  // For round/cylinder: whether it's hollow
+  hollow?: boolean
+  // For arch: inner radius in studs
+  archInnerRadius?: number
+}
 
 /**
  * Connection point types
@@ -52,6 +80,10 @@ export interface BrickDefinition {
   ldrawId: string               // LDraw part number (e.g., "3001.dat")
   name: string                  // Display name
   category: BrickCategory
+
+  // Shape type for geometry generation (defaults to 'box')
+  shape?: BrickShape
+  shapeParams?: ShapeParams
 
   // Dimensions in stud units and plate heights
   dimensions: {

@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react'
 import { useUIStore, useSceneStore, type Tool } from '@/store'
+import { SaveLoadDialog } from './SaveLoadDialog'
+import { storageService } from '@/services/StorageService'
 
 const tools: { id: Tool; icon: string; label: string }[] = [
   { id: 'select', icon: '👆', label: 'Select' },
@@ -8,6 +11,12 @@ const tools: { id: Tool; icon: string; label: string }[] = [
 ]
 
 export function Toolbar() {
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogMode, setDialogMode] = useState<'save' | 'load'>('save')
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  const bricks = useSceneStore(state => state.bricks)
   const currentTool = useUIStore(state => state.currentTool)
   const setTool = useUIStore(state => state.setTool)
   const showGrid = useUIStore(state => state.showGrid)
@@ -20,6 +29,54 @@ export function Toolbar() {
   const undo = useSceneStore(state => state.undo)
   const redo = useSceneStore(state => state.redo)
   const clearScene = useSceneStore(state => state.clearScene)
+
+  // Load last project ID on mount
+  useEffect(() => {
+    storageService.init().then(async () => {
+      const lastId = await storageService.getLastProjectId()
+      if (lastId) {
+        setCurrentProjectId(lastId)
+      }
+    })
+  }, [])
+
+  // Track unsaved changes
+  useEffect(() => {
+    setHasUnsavedChanges(true)
+  }, [bricks])
+
+  // Keyboard shortcuts for save/load
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        setDialogMode('save')
+        setDialogOpen(true)
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault()
+        setDialogMode('load')
+        setDialogOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  const handleOpenSave = () => {
+    setDialogMode('save')
+    setDialogOpen(true)
+  }
+
+  const handleOpenLoad = () => {
+    setDialogMode('load')
+    setDialogOpen(true)
+  }
+
+  const handleProjectChange = (projectId: string | null) => {
+    setCurrentProjectId(projectId)
+    setHasUnsavedChanges(false)
+  }
 
   return (
     <div style={styles.toolbar}>
@@ -99,6 +156,41 @@ export function Toolbar() {
           <span style={{ fontSize: 14 }}>G</span>
         </button>
       </div>
+
+      <div style={styles.separator} />
+
+      {/* Save/Load controls */}
+      <div style={styles.toolGroup}>
+        <button
+          style={{
+            ...styles.toolButton,
+            position: 'relative',
+          }}
+          onClick={handleOpenSave}
+          title="Save Project (Ctrl+S)"
+        >
+          💾
+          {hasUnsavedChanges && bricks.size > 0 && (
+            <span style={styles.unsavedDot} />
+          )}
+        </button>
+        <button
+          style={styles.toolButton}
+          onClick={handleOpenLoad}
+          title="Load Project (Ctrl+O)"
+        >
+          📂
+        </button>
+      </div>
+
+      {/* Save/Load Dialog */}
+      <SaveLoadDialog
+        isOpen={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        mode={dialogMode}
+        currentProjectId={currentProjectId}
+        onProjectChange={handleProjectChange}
+      />
     </div>
   )
 }
@@ -145,5 +237,15 @@ const styles: Record<string, React.CSSProperties> = {
     width: 1,
     height: 30,
     backgroundColor: '#ddd',
+  },
+  unsavedDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    backgroundColor: '#ff9800',
+    borderRadius: '50%',
+    border: '1px solid white',
   },
 }

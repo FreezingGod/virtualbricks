@@ -28,9 +28,30 @@ export class BrickGeometryGenerator {
   }
 
   /**
-   * Generate geometry for a basic brick
+   * Generate geometry based on brick shape type
    */
   private static generateBrickGeometry(definition: BrickDefinition): THREE.BufferGeometry {
+    const shape = definition.shape || 'box'
+
+    switch (shape) {
+      case 'slope':
+        return this.generateSlopeGeometry(definition)
+      case 'slope_inverted':
+        return this.generateInvertedSlopeGeometry(definition)
+      case 'round':
+      case 'cylinder':
+        return this.generateRoundGeometry(definition)
+      case 'cone':
+        return this.generateConeGeometry(definition)
+      default:
+        return this.generateBoxGeometry(definition)
+    }
+  }
+
+  /**
+   * Generate geometry for a basic box brick
+   */
+  private static generateBoxGeometry(definition: BrickDefinition): THREE.BufferGeometry {
     const { width, depth, height } = definition.dimensions
 
     const widthMM = width * LEGO.STUD_SPACING
@@ -75,6 +96,295 @@ export class BrickGeometryGenerator {
     const mergedGeometry = this.mergeGeometries(geometries)
 
     // Clean up individual geometries
+    geometries.forEach(g => g.dispose())
+
+    return mergedGeometry
+  }
+
+  /**
+   * Generate geometry for a slope brick
+   */
+  private static generateSlopeGeometry(definition: BrickDefinition): THREE.BufferGeometry {
+    const { width, depth, height } = definition.dimensions
+    const slopeAngle = definition.shapeParams?.slopeAngle || 45
+    const direction = definition.shapeParams?.slopeDirection || 'front'
+
+    const widthMM = width * LEGO.STUD_SPACING
+    const depthMM = depth * LEGO.STUD_SPACING
+    const heightMM = height * LEGO.PLATE_HEIGHT
+
+    const geometries: THREE.BufferGeometry[] = []
+
+    // Create slope body
+    const slopeBody = this.createSlopeBody(widthMM, heightMM, depthMM, slopeAngle, direction)
+    geometries.push(slopeBody)
+
+    // Add studs only on the flat part (back row for front-facing slope)
+    const studPositions = this.getSlopeStudPositions(width, depth, direction)
+    for (const pos of studPositions) {
+      const studGeometry = this.createBeveledCylinder(
+        LEGO.STUD_RADIUS,
+        LEGO.STUD_HEIGHT,
+        BEVEL_SIZE * 0.5
+      )
+      studGeometry.translate(
+        (pos.x + 0.5 - width / 2) * LEGO.STUD_SPACING,
+        heightMM + LEGO.STUD_HEIGHT / 2,
+        (pos.z + 0.5 - depth / 2) * LEGO.STUD_SPACING
+      )
+      geometries.push(studGeometry)
+    }
+
+    const mergedGeometry = this.mergeGeometries(geometries)
+    geometries.forEach(g => g.dispose())
+
+    return mergedGeometry
+  }
+
+  /**
+   * Create the main body of a slope brick
+   * Real LEGO slopes have:
+   * - A flat top surface with studs (set back from front)
+   * - A sloped front face
+   * - Full height back wall
+   * - Trapezoidal side profiles
+   */
+  private static createSlopeBody(
+    width: number,
+    height: number,
+    depth: number,
+    _angle: number,
+    direction: 'front' | 'back' | 'left' | 'right'
+  ): THREE.BufferGeometry {
+    const hw = width / 2
+    const hd = depth / 2
+
+    // The top flat area is about 1 stud deep (for placing studs)
+    // The slope starts from the front and goes up to meet the top
+    const topDepth = Math.min(depth * 0.4, LEGO.STUD_SPACING) // Flat top area depth
+    const slopeDepth = depth - topDepth // How far the slope extends
+
+    if (direction === 'front') {
+      // Calculate slope normal
+      const slopeRise = height
+      const slopeRun = slopeDepth
+      const slopeLen = Math.sqrt(slopeRise * slopeRise + slopeRun * slopeRun)
+      const slopeNormY = slopeRun / slopeLen
+      const slopeNormZ = slopeRise / slopeLen
+
+      const positions: number[] = []
+      const norms: number[] = []
+      const indices: number[] = []
+
+      const addQuad = (
+        p0: number[], p1: number[], p2: number[], p3: number[],
+        n: number[]
+      ) => {
+        const baseIndex = positions.length / 3
+        positions.push(...p0, ...p1, ...p2, ...p3)
+        norms.push(...n, ...n, ...n, ...n)
+        indices.push(
+          baseIndex, baseIndex + 1, baseIndex + 2,
+          baseIndex, baseIndex + 2, baseIndex + 3
+        )
+      }
+
+      // Key vertices (viewed from right side, front is +Z):
+      // Top-back: (-hd)  at height
+      // Top-front edge of flat: (-hd + topDepth) at height
+      // Bottom-front: (+hd) at 0
+      // Bottom-back: (-hd) at 0
+
+      const topFrontZ = -hd + topDepth  // Where the flat top ends and slope begins
+
+      // Bottom face (full rectangle)
+      addQuad(
+        [-hw, 0, hd], [hw, 0, hd],
+        [hw, 0, -hd], [-hw, 0, -hd],
+        [0, -1, 0]
+      )
+
+      // Back face (full height vertical wall)
+      addQuad(
+        [-hw, 0, -hd], [hw, 0, -hd],
+        [hw, height, -hd], [-hw, height, -hd],
+        [0, 0, -1]
+      )
+
+      // Top face (flat rectangle for studs)
+      addQuad(
+        [-hw, height, -hd], [hw, height, -hd],
+        [hw, height, topFrontZ], [-hw, height, topFrontZ],
+        [0, 1, 0]
+      )
+
+      // Slope face (from bottom front up to top front edge)
+      addQuad(
+        [hw, 0, hd], [-hw, 0, hd],
+        [-hw, height, topFrontZ], [hw, height, topFrontZ],
+        [0, slopeNormY, slopeNormZ]
+      )
+
+      // Left side (trapezoid)
+      addQuad(
+        [-hw, 0, hd], [-hw, 0, -hd],
+        [-hw, height, -hd], [-hw, height, topFrontZ],
+        [-1, 0, 0]
+      )
+
+      // Right side (trapezoid)
+      addQuad(
+        [hw, 0, -hd], [hw, 0, hd],
+        [hw, height, topFrontZ], [hw, height, -hd],
+        [1, 0, 0]
+      )
+
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(norms, 3))
+      geometry.setIndex(indices)
+
+      return geometry
+    }
+
+    // Fallback: return a simple box for other directions (to be implemented)
+    return new THREE.BoxGeometry(width, height, depth)
+  }
+
+  /**
+   * Get stud positions for a slope (only on flat areas)
+   */
+  private static getSlopeStudPositions(
+    width: number,
+    depth: number,
+    direction: 'front' | 'back' | 'left' | 'right'
+  ): { x: number; z: number }[] {
+    const positions: { x: number; z: number }[] = []
+
+    if (direction === 'front') {
+      // Studs only on back row
+      for (let x = 0; x < width; x++) {
+        positions.push({ x, z: 0 })
+      }
+    } else if (direction === 'back') {
+      for (let x = 0; x < width; x++) {
+        positions.push({ x, z: depth - 1 })
+      }
+    }
+
+    return positions
+  }
+
+  /**
+   * Generate geometry for an inverted slope brick
+   */
+  private static generateInvertedSlopeGeometry(definition: BrickDefinition): THREE.BufferGeometry {
+    // Similar to slope but inverted
+    return this.generateSlopeGeometry(definition)
+  }
+
+  /**
+   * Generate geometry for a round brick/plate
+   */
+  private static generateRoundGeometry(definition: BrickDefinition): THREE.BufferGeometry {
+    const { width, height } = definition.dimensions
+    const heightMM = height * LEGO.PLATE_HEIGHT
+    const radius = (width * LEGO.STUD_SPACING) / 2
+
+    const geometries: THREE.BufferGeometry[] = []
+
+    // Main cylindrical body
+    const bodyGeometry = new THREE.CylinderGeometry(
+      radius - BEVEL_SIZE,
+      radius - BEVEL_SIZE,
+      heightMM - BEVEL_SIZE * 2,
+      24
+    )
+    bodyGeometry.translate(0, heightMM / 2, 0)
+    geometries.push(bodyGeometry)
+
+    // Top bevel ring
+    const topBevel = new THREE.TorusGeometry(
+      radius - BEVEL_SIZE,
+      BEVEL_SIZE,
+      8,
+      24,
+      Math.PI * 2
+    )
+    topBevel.rotateX(Math.PI / 2)
+    topBevel.translate(0, heightMM - BEVEL_SIZE, 0)
+    geometries.push(topBevel)
+
+    // Bottom bevel ring
+    const bottomBevel = new THREE.TorusGeometry(
+      radius - BEVEL_SIZE,
+      BEVEL_SIZE,
+      8,
+      24,
+      Math.PI * 2
+    )
+    bottomBevel.rotateX(Math.PI / 2)
+    bottomBevel.translate(0, BEVEL_SIZE, 0)
+    geometries.push(bottomBevel)
+
+    // Top face
+    const topFace = new THREE.CircleGeometry(radius - BEVEL_SIZE, 24)
+    topFace.rotateX(-Math.PI / 2)
+    topFace.translate(0, heightMM, 0)
+    geometries.push(topFace)
+
+    // Center stud
+    const studGeometry = this.createBeveledCylinder(
+      LEGO.STUD_RADIUS,
+      LEGO.STUD_HEIGHT,
+      BEVEL_SIZE * 0.5
+    )
+    studGeometry.translate(0, heightMM + LEGO.STUD_HEIGHT / 2, 0)
+    geometries.push(studGeometry)
+
+    const mergedGeometry = this.mergeGeometries(geometries)
+    geometries.forEach(g => g.dispose())
+
+    return mergedGeometry
+  }
+
+  /**
+   * Generate geometry for a cone brick
+   */
+  private static generateConeGeometry(definition: BrickDefinition): THREE.BufferGeometry {
+    const { width, height } = definition.dimensions
+    const heightMM = height * LEGO.PLATE_HEIGHT
+    const bottomRadius = (width * LEGO.STUD_SPACING) / 2
+    const topRadius = LEGO.STUD_RADIUS
+
+    const geometries: THREE.BufferGeometry[] = []
+
+    // Main cone body
+    const coneGeometry = new THREE.CylinderGeometry(
+      topRadius,
+      bottomRadius - BEVEL_SIZE,
+      heightMM,
+      24
+    )
+    coneGeometry.translate(0, heightMM / 2, 0)
+    geometries.push(coneGeometry)
+
+    // Bottom circle
+    const bottomFace = new THREE.CircleGeometry(bottomRadius - BEVEL_SIZE, 24)
+    bottomFace.rotateX(Math.PI / 2)
+    bottomFace.translate(0, 0, 0)
+    geometries.push(bottomFace)
+
+    // Top stud
+    const studGeometry = this.createBeveledCylinder(
+      LEGO.STUD_RADIUS,
+      LEGO.STUD_HEIGHT,
+      BEVEL_SIZE * 0.5
+    )
+    studGeometry.translate(0, heightMM + LEGO.STUD_HEIGHT / 2, 0)
+    geometries.push(studGeometry)
+
+    const mergedGeometry = this.mergeGeometries(geometries)
     geometries.forEach(g => g.dispose())
 
     return mergedGeometry

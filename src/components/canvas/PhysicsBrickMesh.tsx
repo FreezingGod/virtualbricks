@@ -45,6 +45,7 @@ export function PhysicsBrickMesh({ brick, isGrounded }: PhysicsBrickMeshProps) {
       metalness: 0.0,
       transparent: brick.isGhost || (color.alpha !== undefined),
       opacity: brick.isGhost ? 0.5 : (color.alpha ?? 1),
+      side: THREE.DoubleSide,
     })
 
     return { geometry: geo, material: mat }

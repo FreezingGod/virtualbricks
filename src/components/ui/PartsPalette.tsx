@@ -11,9 +11,14 @@ export function PartsPalette() {
 
   if (!showPartsPalette) return null
 
-  const bricks = BrickRegistry.getByCategory('basic')
-  const plates = bricks.filter(b => b.dimensions.height === 1)
-  const standardBricks = bricks.filter(b => b.dimensions.height === 3)
+  // Get bricks by category
+  const basicBricks = BrickRegistry.getByCategory('basic')
+  const slopeBricks = BrickRegistry.getByCategory('slope')
+  const roundBricks = BrickRegistry.getByCategory('round')
+
+  // Subdivide basic bricks
+  const plates = basicBricks.filter(b => b.dimensions.height === 1)
+  const standardBricks = basicBricks.filter(b => b.dimensions.height === 3)
 
   const handleSelect = (definition: BrickDefinition) => {
     setSelectedDefinition(definition.id)
@@ -55,6 +60,40 @@ export function PartsPalette() {
           ))}
         </div>
       </div>
+
+      {slopeBricks.length > 0 && (
+        <div style={styles.category}>
+          <h4 style={styles.categoryTitle}>Slopes</h4>
+          <div style={styles.grid}>
+            {slopeBricks.map(def => (
+              <PartItem
+                key={def.id}
+                definition={def}
+                isSelected={selectedDefinitionId === def.id}
+                onSelect={() => handleSelect(def)}
+                colorHex={selectedColor.hex}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {roundBricks.length > 0 && (
+        <div style={styles.category}>
+          <h4 style={styles.categoryTitle}>Round</h4>
+          <div style={styles.grid}>
+            {roundBricks.map(def => (
+              <PartItem
+                key={def.id}
+                definition={def}
+                isSelected={selectedDefinitionId === def.id}
+                onSelect={() => handleSelect(def)}
+                colorHex={selectedColor.hex}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -67,8 +106,77 @@ interface PartItemProps {
 }
 
 function PartItem({ definition, isSelected, onSelect, colorHex }: PartItemProps) {
-  const { dimensions } = definition
+  const { dimensions, shape } = definition
   const label = `${dimensions.width}x${dimensions.depth}`
+
+  // Render different preview shapes based on brick shape type
+  const renderPreview = () => {
+    const baseWidth = Math.min(dimensions.width * 10, 36)
+    const baseHeight = Math.min(dimensions.depth * 10, 36)
+
+    if (shape === 'slope') {
+      // Slope: triangle-ish shape
+      return (
+        <svg width={baseWidth} height={baseHeight} viewBox="0 0 40 40">
+          <polygon
+            points="0,40 40,40 40,10 0,40"
+            fill={colorHex}
+            stroke="rgba(0,0,0,0.2)"
+            strokeWidth="1"
+          />
+          <polygon
+            points="0,40 40,10 40,0 0,0"
+            fill={colorHex}
+            stroke="rgba(0,0,0,0.2)"
+            strokeWidth="1"
+            opacity="0.7"
+          />
+        </svg>
+      )
+    }
+
+    if (shape === 'round' || shape === 'cylinder') {
+      // Round: circle
+      return (
+        <div
+          style={{
+            width: baseWidth,
+            height: baseWidth,
+            backgroundColor: colorHex,
+            borderRadius: '50%',
+            border: '1px solid rgba(0,0,0,0.2)',
+          }}
+        />
+      )
+    }
+
+    if (shape === 'cone') {
+      // Cone: triangle
+      return (
+        <svg width={baseWidth} height={baseHeight} viewBox="0 0 40 40">
+          <polygon
+            points="20,0 40,40 0,40"
+            fill={colorHex}
+            stroke="rgba(0,0,0,0.2)"
+            strokeWidth="1"
+          />
+        </svg>
+      )
+    }
+
+    // Default: rectangle
+    return (
+      <div
+        style={{
+          width: baseWidth,
+          height: baseHeight,
+          backgroundColor: colorHex,
+          borderRadius: 2,
+          border: '1px solid rgba(0,0,0,0.2)',
+        }}
+      />
+    )
+  }
 
   return (
     <button
@@ -80,16 +188,7 @@ function PartItem({ definition, isSelected, onSelect, colorHex }: PartItemProps)
       title={definition.name}
     >
       <div style={styles.partPreview}>
-        {/* Simple visual representation */}
-        <div
-          style={{
-            width: Math.min(dimensions.width * 8, 40),
-            height: Math.min(dimensions.depth * 8, 40),
-            backgroundColor: colorHex,
-            borderRadius: 2,
-            border: '1px solid rgba(0,0,0,0.2)',
-          }}
-        />
+        {renderPreview()}
       </div>
       <span style={styles.partLabel}>{label}</span>
     </button>
@@ -102,7 +201,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: 10,
     top: 70,
     width: 200,
-    maxHeight: 'calc(100vh - 90px)',
+    maxHeight: 'calc(100vh - 250px)',
     overflowY: 'auto',
     padding: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',

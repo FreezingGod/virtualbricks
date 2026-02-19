@@ -46,6 +46,7 @@ export function GhostBrick() {
       metalness: 0.0,
       transparent: true,
       opacity: 0.5,
+      side: THREE.DoubleSide,
     })
 
     materialRef.current = mat

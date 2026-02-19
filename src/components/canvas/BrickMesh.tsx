@@ -37,6 +37,7 @@ export function BrickMesh({ brick }: BrickMeshProps) {
       metalness: 0.0,
       transparent: brick.isGhost || (color.alpha !== undefined),
       opacity: brick.isGhost ? 0.5 : (color.alpha ?? 1),
+      side: THREE.DoubleSide, // Ensure both sides are rendered for non-box shapes
     })
 
     return { geometry: geo, material: mat }
