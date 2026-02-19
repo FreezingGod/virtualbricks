@@ -1,15 +1,17 @@
 # VirtualBricks
 
-A web-based LEGO brick building simulator built with React, Three.js, and TypeScript.
+[中文文档](./README_CN.md)
+
+A web-based brick building simulator built with React, Three.js, and TypeScript.
 
 ## Features
 
 ### Brick Building
 - **45+ Brick Types**: Standard bricks, plates, slopes (33°/45°/65°), round bricks, and cones
-- **Snap-to-Grid**: Automatic alignment to LEGO grid system
+- **Snap-to-Grid**: Automatic alignment to standard brick grid system
 - **Connection Detection**: Smart snapping between brick studs and anti-studs
 - **Collision Detection**: Prevents overlapping brick placement
-- **Color Selection**: 47+ official LEGO colors
+- **Color Selection**: 47+ colors available
 
 ### Tools
 - **Place Tool**: Add new bricks to the scene
@@ -25,7 +27,7 @@ A web-based LEGO brick building simulator built with React, Three.js, and TypeSc
 ### Rendering
 - **PBR Materials**: Realistic plastic appearance with proper roughness/metalness
 - **Shadows**: Dynamic shadow casting and receiving
-- **Beveled Edges**: Authentic LEGO brick edge chamfers
+- **Beveled Edges**: Authentic brick edge chamfers
 
 ## Tech Stack
 
@@ -86,7 +88,7 @@ src/
 │   │   └── BrickGeometry.ts
 │   ├── connection/      # Snap detection
 │   ├── collision/       # Collision detection
-│   └── constants/       # LEGO dimensions
+│   └── constants/       # Brick dimensions
 ├── exporters/           # File format exporters
 │   └── LDrawExporter.ts
 ├── services/            # Storage services
@@ -95,9 +97,9 @@ src/
 └── types/               # TypeScript types
 ```
 
-## LEGO Dimensions
+## Brick Dimensions
 
-The simulator uses accurate LEGO dimensions:
+The simulator uses standard brick dimensions:
 
 | Measurement | Value |
 |-------------|-------|
@@ -161,11 +163,7 @@ SOFTWARE.
 
 ## Acknowledgments
 
-- [LDraw.org](https://www.ldraw.org/) - LEGO CAD standards and part library
+- [LDraw.org](https://www.ldraw.org/) - CAD standards and part library
 - [BrickLink](https://www.bricklink.com/) - Color references
 - [Three.js](https://threejs.org/) - 3D graphics library
 - [React Three Fiber](https://docs.pmnd.rs/react-three-fiber/) - React renderer for Three.js
-
----
-
-**Note**: LEGO is a trademark of the LEGO Group, which does not sponsor, authorize, or endorse this project.
